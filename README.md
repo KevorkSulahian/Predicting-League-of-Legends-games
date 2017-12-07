@@ -214,5 +214,122 @@ team_summary$WP <- team_summary$kill^exponent/(team_summary$kill^exponent + team
 |18        Team Vitality | 225|   282| 0.26939079|
 |19                  TSM | 581|   480| 0.69925819|
 |20     Unicorns of Love | 416|   414| 0.50532324|
-> 
 
+## Calculating using the Bradley Terry Model
+
+```
+BTM <- players_details %>%
+  group_by(Name, Team1, Team2) %>%
+  summarise(kill = sum(Kill), death = sum(Death))
+
+BTM <- ddply(players_details, .(Name, Team1, Team2), summarize, kill = sum(Kill), death = sum(Death))
+
+```
+Note that sometimes one of the BTM's do not work but both are supposed to return the same values.
+
+```
+head(BTM, n= 5)
+```
+|                  Name  |Team1|Team2|Kill|Death|
+| ---------------------- |:--:|:----:|:--:|----:|
+|1                Adrian | DIG|   C9 | 2  |7    |
+|2                Adrian | DIG|   CLG| 6  |13   |
+|3             Adrian    |DIG |   FOX| 2  |7    |
+|4              Adrian   | DIG|   IMT| 2  |4    |
+|5                Adrian | DIG|   P1 | 2  |10   |
+
+```
+model<- BTm(cbind(Kill,Death),Team1,Team2,data=players_details, id="")
+summary(model)
+```
+#### We will get from the Summary
+```
+Call:
+BTm(outcome = cbind(Kill, Death), player1 = Team1, player2 = Team2, 
+    id = "GAME_", data = players_details)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-4.3738  -1.2777  -0.2204   0.9815   4.3768  
+
+Coefficients: (1 not defined because of singularities)
+         Estimate Std. Error z value Pr(>|z|)    
+GAME_CLG -0.09771    0.05574  -1.753 0.079619 .  
+GAME_DIG -0.33734    0.05701  -5.917 3.28e-09 ***
+GAME_FLY -0.61498    0.05751 -10.694  < 2e-16 ***
+GAME_FNC  0.78349    0.08597   9.114  < 2e-16 ***
+GAME_FOX -0.56081    0.06038  -9.287  < 2e-16 ***
+GAME_G2   0.43675    0.08444   5.172 2.31e-07 ***
+GAME_H2K  0.63266    0.08316   7.608 2.79e-14 ***
+GAME_IMT -0.07386    0.05563  -1.328 0.184226    
+GAME_MM  -0.36835    0.08258  -4.461 8.17e-06 ***
+GAME_MSF  0.31410    0.07767   4.044 5.26e-05 ***
+GAME_NIP -0.28852    0.08368  -3.448 0.000565 ***
+GAME_NV  -0.32442    0.05928  -5.472 4.44e-08 ***
+GAME_P1  -0.43747    0.05808  -7.533 4.96e-14 ***
+GAME_ROC -0.16373    0.08292  -1.975 0.048313 *  
+GAME_SPY  0.34782    0.08206   4.238 2.25e-05 ***
+GAME_TL  -0.43706    0.05984  -7.304 2.80e-13 ***
+GAME_TSM -0.11203    0.05838  -1.919 0.054983 .  
+GAME_UOL  0.17971    0.07945   2.262 0.023697 *  
+GAME_VIT       NA         NA      NA       NA    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 4437.5  on 1495  degrees of freedom
+Residual deviance: 3733.7  on 1477  degrees of freedom
+AIC: 7438.8
+
+Number of Fisher Scoring iterations: 4
+```
+### Get the coefficients in order to start predicting
+```
+coef <- model$coefficients
+sort(coef, decreasing = T) # sorts from the best to the worst team
+
+
+length(unique(players_details$Team1))
+# 20 teams overall
+
+length(coef)
+# and we 19 coefs
+```
+#### Lets first calculate Automatically
+```
+TeamSoloMid <- data.frame(Team1=rep("TSM", 2),
+                          Team2=c("Cloud9", "H2K")) ## we are tying to get TSM versus two team Cloud 9 and H2k
+
+team <- model$coefficients
+TeamSoloMid$Team1<- factor(TeamSoloMid$Team1,levels=team_summary$Team) #setting the levels
+
+TeamSoloMid$Team2<-factor(TeamSoloMid$Team2,levels=team_summary$Team) # setting the leves
+
+TSM_P <- predict(model, newdata = TeamSoloMid, level = 2, type = "response",scale=NULL)
+
+TSM_P # gives us that the probability of tsm winning against Cloud 9 is 47% and vs H2K is 32% (But we all know NA > EU )  :sweat_smile: 
+
+# now we try to get the win percentage for both teams
+TSM_df <- data.frame(TeamSoloMid, Team1= TSM_P, Team2 = 1- TSM_P)
+
+TSM_df
+```
+|Team1|Team2  |Team1$WP|Team2$WP|
+| --- |:-----:|:------:|-------:|
+|1 TSM| Cloud9|     47%|     53%|
+|2 TSM| H2K   |     32%|     68%|
+
+#### Second We calculate Manually
+``` 
+TSM_ab <- coef1[rownames(coef1)=="TSM",1]
+CLG_ab<- coef1[rownames(coef1)=="CLG",1]
+TL_ab <- coef1[rownames(coef1)=="TL",1]
+
+exp(TSM_ab)/(exp(TSM_ab)+(exp(CLG_ab)))
+# 49% chance of TSM winning
+exp(TSM_ab)/(exp(TSM_ab)+(exp(TL_ab)))
+# 58% chance of TSM winning
+```
+So we come to an end. Hope you liked what I've done and I can't wait to hear your opinions and see your comments.
+Thanks for reading
