@@ -296,6 +296,20 @@ length(unique(players_details$Team1))
 length(coef)
 # and we 19 coefs
 ```
+|Team  |Ability|s.e.    |
+| ---- |:-----:|:------:|
+|1  FNC| 0.78  |    0.08|
+|2  H2k| 0.63  |    0.08|
+|3  G2 | 0.43  |0.08    |
+|4  SPY| 0.34  |    0.08|
+|5  MSF| 0.31  |    0.07|
+|6  UOL| 0.17  |    0.07|
+|7  C9 | 0.00  |    0.00|
+|8  IMT| -0.07 |    0.05|
+|9  CLG| -0.09 |    0.05|
+|10 TSM| -0.11 |    0.05|
+|11 ROC| -0.16 |    0.08|
+
 #### Lets first calculate Automatically
 ```
 TeamSoloMid <- data.frame(Team1=rep("TSM", 2),
