@@ -27,15 +27,6 @@ colnames(players)<-c("Name","Role","Team","Results","Total.Points",
                      "Avg.Points.Per.Game","Game.Played","Kill","Death","Assists",
                      "Creep.Kill","ten.A","triple.quadra.penta.kills")
 
-## Deconding multiple kills (explanation of multiple kills are above)
-## ( DONT FORGET   TO EXPLAIN WHAT MULTIPLE KILLS ARE)
-players$triple.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][1])))
-players$quadra.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][2])))
-players$penta.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][3])))
-
-
-#convert creep.kill(CS) to numeric and remove old column
-players$Creep.Kill<-sapply(players$Creep.Kill, function(x) as.numeric(gsub(",","",x)))
 players$triple.quadra.penta.kills<-NULL
 
 
@@ -78,7 +69,6 @@ players_details$Results<-NULL
 ## players_summary is the sum of all the games each player has played
 players_summary <- players %>% dplyr::filter(my_index==1) %>% dplyr::select(-c(my_index))
 
-#players_summary<- normalizeCols(players_summary)
 players_summary$KDA <- (players_summary$Kill + players_summary$Assists) / players_summary$Death
 ```
 ### Now we can start creating some graphs
