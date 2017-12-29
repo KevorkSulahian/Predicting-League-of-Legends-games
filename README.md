@@ -443,6 +443,7 @@ team_details$error <- abs(team_details$Home_Prob - team_details$Result)
 sqrt(mean(team_details$error^2))
 # 37 percent error which is same as the Pythagorean formula error
 ```
+### the prob's based on the Elo rating can be found in the team_details Data
 
 So we come to an end. Hope you liked what I've done and I can't wait to hear your opinions and see your comments.
 Thanks for reading
