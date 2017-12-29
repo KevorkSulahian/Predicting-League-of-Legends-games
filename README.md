@@ -27,15 +27,6 @@ colnames(players)<-c("Name","Role","Team","Results","Total.Points",
                      "Avg.Points.Per.Game","Game.Played","Kill","Death","Assists",
                      "Creep.Kill","ten.A","triple.quadra.penta.kills")
 
-## Deconding multiple kills (explanation of multiple kills are above)
-## ( DONT FORGET   TO EXPLAIN WHAT MULTIPLE KILLS ARE)
-players$triple.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][1])))
-players$quadra.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][2])))
-players$penta.kills<-sapply(players$triple.quadra.penta.kills, function(x) as.numeric(gsub(" ","",strsplit(x,'/')[[1]][3])))
-
-
-#convert creep.kill(CS) to numeric and remove old column
-players$Creep.Kill<-sapply(players$Creep.Kill, function(x) as.numeric(gsub(",","",x)))
 players$triple.quadra.penta.kills<-NULL
 
 
@@ -78,7 +69,6 @@ players_details$Results<-NULL
 ## players_summary is the sum of all the games each player has played
 players_summary <- players %>% dplyr::filter(my_index==1) %>% dplyr::select(-c(my_index))
 
-#players_summary<- normalizeCols(players_summary)
 players_summary$KDA <- (players_summary$Kill + players_summary$Assists) / players_summary$Death
 ```
 ### Now we can start creating some graphs
@@ -296,6 +286,20 @@ length(unique(players_details$Team1))
 length(coef)
 # and we 19 coefs
 ```
+|Team  |Ability|s.e.    |
+| ---- |:-----:|:------:|
+|1  FNC| 0.78  |    0.08|
+|2  H2k| 0.63  |    0.08|
+|3  G2 | 0.43  |0.08    |
+|4  SPY| 0.34  |    0.08|
+|5  MSF| 0.31  |    0.07|
+|6  UOL| 0.17  |    0.07|
+|7  C9 | 0.00  |    0.00|
+|8  IMT| -0.07 |    0.05|
+|9  CLG| -0.09 |    0.05|
+|10 TSM| -0.11 |    0.05|
+|11 ROC| -0.16 |    0.08|
+
 #### Lets first calculate Automatically
 ```
 TeamSoloMid <- data.frame(Team1=rep("TSM", 2),
@@ -331,5 +335,115 @@ exp(TSM_ab)/(exp(TSM_ab)+(exp(CLG_ab)))
 exp(TSM_ab)/(exp(TSM_ab)+(exp(TL_ab)))
 # 58% chance of TSM winning
 ```
+
+## predicition based on elo Rating
+#### Note that we are using different files elo.r for this section 
+## the idea
+### Assign performance rating to each team. This rating is going to show the ability of the team to win
+### After each game update the rating of the player based on the outcome.
+### Using the ability scores to predict the match outcome of the game.
+
+```
+team_details <- ddply(players_details, .(Team1, Team2, Result), summarize, kill = sum(Kill), death = sum(Death))
+team_details$League <- c("Summer Split")
+```
+
+### Starting with Elo's
+```
+
+
+elos<-elo.run(score(kill,death)~ Team1+ Team2, data=team_details,k=20)
+
+elos_df<-as.data.frame(elos)
+
+head(elos_df, n = 20) # 20 teams only
+
+dim(elos_df) #DF has only 460 entries
+
+# getting the last teams who played in the DF
+
+LCS_last<-tail(elos_df,n=4)
+LCS_last[order(LCS_last$elo,decreasing = T),2:3]
+
+```
+#### Since the DF which I have was not complete I had to create a virtural round to predic the games from
+#### the round is called round.csv
+```
+Home Opponent home_win_prob away_win_prob
+1  NIP       G2          0.31          0.69
+2   P1      DIG          0.47          0.53
+```
+#### Defining the Home and Away team
+```
+elo_h<-left_join(Round,LCS_last,by=c("Home"="team"))
+
+elo_h
+
+elo_a<-left_join(Round,LCS_last,by=c("Opponent"="team"))
+
+elo_a
+
+elo_a<-elo_a[,"elo"]
+
+elo_h<-elo_h[,"elo"]
+
+ht_W <- elo.prob(elo_h, elo_a)
+
+# if the DB was complete and the round was big we could have used this to get the prob's for all the games
+Round$home_win_prob <- c(0.5505317)
+Round$away_win_prob<- 1- Round$home_win_prob
+```
+### Calculating the elo for each game
+```
+LCS<-as.data.frame(elo.run(score(kill,death)~
+                              Team1+Team2,data=team_details,k=20))
+```
+### Calculating the G where it is the score difference. I used the same formula from the website Eloratings.net
+```
+team_details$G<-ifelse(abs(team_details$kill - team_details$death)<=1, 1,
+                    ifelse(abs(team_details$kill - team_details$death)==2, 1.5,
+                           (abs(team_details$kill - team_details$death)+11)/8))
+```
+### just in case if the data was complete we could have calculated the K factor, so I added League myself
+```
+team_details$K<- ifelse(team_details$League == "",20,
+                     ifelse(team_details$League == "promotion",30,
+                            ifelse(team_details$League == "Round Robinr", 40,
+                                   ifelse(team_details$League == "Summer Split" || "Winter Split",50,
+                                          ifelse(team_details$League == "World Championship", 60)))))
+```
+### and the final elo
+```
+LCS2<-as.data.frame(elo.run(score(kill,death) ~ Team1 + Team2+
+                              k(team_details$K * team_details$G), data =team_details))
+```
+|Game  |Team   | Elo    |
+| ---- |:-----:|:------:|
+|0     | C9    |    1500|
+|0     | CLG   |    1500|
+|0     | DIG   |1500    |
+|1     | C9    |1390.625|
+|1     | CLG   |1609.375|
+|1     | DIG   |1586.345|
+
+
+### divivded the LCS DB into 2 (home, away) I figured that all home teams were odd numbers in LCS2 and all away teams were even hat is why I did it this way.
+
+```
+LCS2 <- tail(LCS2, -20)
+## the first 20 which are the teams before they played any match were deleted
+elo_home <- LCS2[seq(1, nrow(LCS2), 2),]
+elo_away <- LCS2[seq(0, nrow(LCS2), 2),]
+team_details$ELO_H<-  elo_home$elo
+team_details$ELO_A<-  elo_away$elo
+## Calculating the Home Prob
+team_details$Home_Prob <- elo.prob(team_details$ELO_H, team_details$ELO_A)
+## calculating the actual score
+team_details$error <- abs(team_details$Home_Prob - team_details$Result)
+sqrt(mean(team_details$error^2))
+# 37 percent error which is same as the Pythagorean formula error
+```
+### the prob's based on the Elo rating can be found in the team_details Data
+
 So we come to an end. Hope you liked what I've done and I can't wait to hear your opinions and see your comments.
 Thanks for reading
